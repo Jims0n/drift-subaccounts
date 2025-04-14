@@ -9,14 +9,26 @@ interface TokenBalance {
     decimals: number;
 }
 
+// Comprehensive token mapping aligned with Drift protocol's market indices
 const TOKEN_METADATA: Record<number, { name: string; decimals: number; symbol: string }> = {
     0: { name: 'USDC', decimals: 6, symbol: 'USDC' },
     1: { name: 'SOL', decimals: 9, symbol: 'SOL' },
-    2: { name: 'BTC', decimals: 6, symbol: 'BTC' },
-    3: { name: 'ETH', decimals: 6, symbol: 'ETH' },
-    // Add more tokens as needed
-  };
-
+    2: { name: 'BTC', decimals: 8, symbol: 'BTC' },
+    3: { name: 'ETH', decimals: 8, symbol: 'ETH' },
+    4: { name: 'PYTH', decimals: 6, symbol: 'PYTH' },
+    5: { name: 'BONK', decimals: 5, symbol: 'BONK' },
+    6: { name: 'JTO', decimals: 8, symbol: 'JTO' },
+    7: { name: 'WBTC', decimals: 8, symbol: 'WBTC' },
+    8: { name: 'MSOL', decimals: 9, symbol: 'MSOL' },
+    9: { name: 'RNDR', decimals: 8, symbol: 'RNDR' },
+    10: { name: 'WETH', decimals: 8, symbol: 'WETH' },
+    11: { name: 'JUP', decimals: 6, symbol: 'JUP' },
+    12: { name: 'STRK', decimals: 8, symbol: 'STRK' },
+    13: { name: 'WIF', decimals: 6, symbol: 'WIF' },
+    14: { name: 'DYM', decimals: 9, symbol: 'DYM' },
+    15: { name: 'USDT', decimals: 6, symbol: 'USDT' },
+    16: { name: 'SEI', decimals: 6, symbol: 'SEI' },
+};
 
 const BalancesTab = () => {
     const { selectedSubaccount, driftClient } = useAppStore();
@@ -27,133 +39,133 @@ const BalancesTab = () => {
     const formatTokenAmount = useCallback((amount: BN, decimals: number): string => {
         if (!amount) return '0';
         try {
-          // Convert to string first to handle BN properly
           const amountStr = amount.toString();
-          // Convert to number with appropriate decimal places
           const amountNum = parseFloat(amountStr) / Math.pow(10, decimals);
           return amountNum.toLocaleString(undefined, { 
             minimumFractionDigits: 2,
             maximumFractionDigits: 6 
           });
-        } catch (e) {
-          console.error('Error formatting token amount:', e);
+        } catch {
           return '0';
         }
       }, []);
-
 
       const refreshBalances = useCallback(async () => {
         if (!selectedSubaccount || !driftClient) return;
         
         setLoading(true);
+        setError(null);
+        
         try {
           // Ensure account subscription is active
           try {
-            // This might fail if already subscribed
             await driftClient.subscribe();
-          } catch (subError) {
-            console.log('Subscribe error (might already be subscribed):', subError);
+          } catch {
+            // Already subscribed, continue
           }
           
           // Force refresh user account data
           try {
             await selectedSubaccount.fetchAccounts();
-          } catch (fetchError) {
-            console.log('Fetch accounts error:', fetchError);
+          } catch {
+            // Continue with existing data
           }
           
           const userAccount = selectedSubaccount.getUserAccount();
           const updatedBalances: TokenBalance[] = [];
           
-          // Get USDC balance first (index 0)
-          try {
-            const quoteToken = userAccount.spotPositions.find(
-              (position: SpotPosition) => position.marketIndex === QUOTE_SPOT_MARKET_INDEX
-            );
-            
-            if (quoteToken && !quoteToken.scaledBalance.isZero()) {
-              const metadata = TOKEN_METADATA[QUOTE_SPOT_MARKET_INDEX] || 
-                { name: 'USDC', decimals: 6, symbol: 'USDC' };
-              
+          // Add USDC balance first (quote token, index 0)
+          const quoteToken = userAccount.spotPositions?.find(
+            (position: SpotPosition) => position.marketIndex === QUOTE_SPOT_MARKET_INDEX
+          );
+          
+          const quoteMetadata = TOKEN_METADATA[QUOTE_SPOT_MARKET_INDEX] || 
+            { name: 'USDC', decimals: 6, symbol: 'USDC' };
+          
+          if (quoteToken && !quoteToken.scaledBalance.isZero()) {
+            try {
               const tokenAmount = selectedSubaccount.getTokenAmount(QUOTE_SPOT_MARKET_INDEX);
-              const formattedAmount = formatTokenAmount(tokenAmount, metadata.decimals);
+              const formattedAmount = formatTokenAmount(tokenAmount, quoteMetadata.decimals);
               
               updatedBalances.push({
-                name: metadata.name,
+                name: quoteMetadata.name,
                 amount: formattedAmount,
-                value: `$${formattedAmount}`,
-                decimals: metadata.decimals
+                value: `$${formattedAmount}`, // USDC value is 1:1 with USD
+                decimals: quoteMetadata.decimals
               });
-            } else {
-              // Add USDC with zero balance if not found
+            } catch {
+              // Add zero balance if error
               updatedBalances.push({
-                name: 'USDC',
+                name: quoteMetadata.name,
                 amount: '0',
                 value: '$0',
-                decimals: 6
+                decimals: quoteMetadata.decimals
               });
             }
-          } catch (e) {
-            console.error('Error getting USDC balance:', e);
-            // Add fallback USDC entry
+          } else {
+            // Add zero balance if not found
             updatedBalances.push({
-              name: 'USDC',
+              name: quoteMetadata.name,
               amount: '0',
               value: '$0',
-              decimals: 6
+              decimals: quoteMetadata.decimals
             });
           }
           
-          // Get other token balances
-          if (userAccount.spotPositions) {
+          // Process other token balances
+          if (userAccount.spotPositions && Array.isArray(userAccount.spotPositions)) {
             for (const position of userAccount.spotPositions) {
-              // Skip USDC as we already added it
-              if (position.marketIndex === QUOTE_SPOT_MARKET_INDEX) continue;
+              // Skip USDC (already added) and zero balances
+              if (position.marketIndex === QUOTE_SPOT_MARKET_INDEX || position.scaledBalance.isZero()) {
+                continue;
+              }
               
-              // Only add non-zero balances
-              if (!position.scaledBalance.isZero()) {
+              const metadata = TOKEN_METADATA[position.marketIndex] || 
+                { name: `Token ${position.marketIndex}`, decimals: 6, symbol: `TOKEN${position.marketIndex}` };
+              
+              try {
+                // Get token amount through the Drift SDK
+                const tokenAmount = selectedSubaccount.getTokenAmount(position.marketIndex);
+                const formattedAmount = formatTokenAmount(tokenAmount, metadata.decimals);
+                
+                // Get token price if available
+                let tokenValue = 0;
                 try {
-                  const metadata = TOKEN_METADATA[position.marketIndex] || 
-                    { name: `Token ${position.marketIndex}`, decimals: 6, symbol: `TOKEN${position.marketIndex}` };
-                  
-                  // Get token amount through the Drift SDK
-                  const tokenAmount = selectedSubaccount.getTokenAmount(position.marketIndex);
-                  const formattedAmount = formatTokenAmount(tokenAmount, metadata.decimals);
-                  
-                  // Get token price if available
-                  let tokenValue = 0;
-                  try {
-                    const marketData = await driftClient.getSpotMarketAccount(position.marketIndex);
-                    if (marketData) {
-                      // Get the oracle price from the market
-                      const oracleData = driftClient.getOracleDataForSpotMarket(position.marketIndex);
-                      if (oracleData && oracleData.price) {
-                        const priceNum = parseFloat(oracleData.price.toString()) / Math.pow(10, 6);
-                        tokenValue = parseFloat(formattedAmount.replace(/,/g, '')) * priceNum;
-                      }
-                    }
-                  } catch (priceError) {
-                    console.log(`Error getting price for token ${position.marketIndex}:`, priceError);
+                  const oracleData = driftClient.getOracleDataForSpotMarket(position.marketIndex);
+                  if (oracleData?.price) {
+                    const priceNum = parseFloat(oracleData.price.toString()) / Math.pow(10, 6);
+                    tokenValue = parseFloat(formattedAmount.replace(/,/g, '')) * priceNum;
                   }
-                  
-                  updatedBalances.push({
-                    name: metadata.name,
-                    amount: formattedAmount,
-                    value: `$${tokenValue.toLocaleString(undefined, { 
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2 
-                    })}`,
-                    decimals: metadata.decimals
-                  });
-                } catch (tokenError) {
-                  console.error(`Error processing token ${position.marketIndex}:`, tokenError);
+                } catch {
+                  // Unable to get price, continue with zero value
                 }
+                
+                updatedBalances.push({
+                  name: metadata.name,
+                  amount: formattedAmount,
+                  value: `$${tokenValue.toLocaleString(undefined, { 
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2 
+                  })}`,
+                  decimals: metadata.decimals
+                });
+              } catch {
+                // Skip token if error processing
               }
             }
           }
           
+          // Sort balances: USDC first, then by value (descending)
+          updatedBalances.sort((a, b) => {
+            if (a.name === 'USDC') return -1;
+            if (b.name === 'USDC') return 1;
+            
+            const aValue = parseFloat(a.value.replace(/[$,]/g, ''));
+            const bValue = parseFloat(b.value.replace(/[$,]/g, ''));
+            return bValue - aValue;
+          });
+          
           setBalances(updatedBalances);
-          setError(null);
         } catch (e) {
           console.error('Error loading balances:', e);
           setError('Could not load balances. The Drift client may not be fully subscribed.');

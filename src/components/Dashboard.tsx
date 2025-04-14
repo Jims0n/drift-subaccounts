@@ -4,13 +4,9 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/stores/app/useAppStore';
 import BalancesTab from './BalancesTab';
 import OpenOrdersTab from './OpenOrdersTab';
+import PerpPostionTab from './PerpPostionTab';
 
-// This will be a placeholder for the Positions tab
-const PositionsTab = () => (
-  <div className="p-4 text-gray-400">
-    Positions data coming soon...
-  </div>
-);
+
 
 export default function Dashboard() {
   const { 
@@ -58,7 +54,7 @@ export default function Dashboard() {
       case 'balances':
         return <BalancesTab />;
       case 'positions':
-        return <PositionsTab />;
+        return <PerpPostionTab />;
       case 'orders':
         return <OpenOrdersTab />;
       default:
