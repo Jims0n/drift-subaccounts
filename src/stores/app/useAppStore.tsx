@@ -1,4 +1,3 @@
-
 import { create } from "zustand";
 import { Connection, PublicKey,  } from '@solana/web3.js';
 import { DriftClient, User, getUserAccountPublicKeySync, } from '@drift-labs/sdk';
@@ -179,6 +178,8 @@ setDriftClient: (driftClient) => set({ driftClient }),
       console.error('Error in subaccount fetching process:', error);
       setSubaccounts([]);
       setSelectedSubaccount(null);
+    } finally {
+      setFetchingSubaccounts(false);
     }
   },
 

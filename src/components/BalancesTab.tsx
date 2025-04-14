@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAppStore } from '../stores/app/useAppStore';
-import { QUOTE_SPOT_MARKET_INDEX, BN } from '@drift-labs/sdk';
+import { QUOTE_SPOT_MARKET_INDEX, BN, SpotPosition } from '@drift-labs/sdk';
 
 interface TokenBalance {
     name: string;
@@ -24,7 +24,7 @@ const BalancesTab = () => {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    const formatTokenAmount = (amount: BN, decimals: number): string => {
+    const formatTokenAmount = useCallback((amount: BN, decimals: number): string => {
         if (!amount) return '0';
         try {
           // Convert to string first to handle BN properly
@@ -39,10 +39,10 @@ const BalancesTab = () => {
           console.error('Error formatting token amount:', e);
           return '0';
         }
-      };
+      }, []);
 
 
-      const refreshBalances = async () => {
+      const refreshBalances = useCallback(async () => {
         if (!selectedSubaccount || !driftClient) return;
         
         setLoading(true);
@@ -68,7 +68,7 @@ const BalancesTab = () => {
           // Get USDC balance first (index 0)
           try {
             const quoteToken = userAccount.spotPositions.find(
-              position => position.marketIndex === QUOTE_SPOT_MARKET_INDEX
+              (position: SpotPosition) => position.marketIndex === QUOTE_SPOT_MARKET_INDEX
             );
             
             if (quoteToken && !quoteToken.scaledBalance.isZero()) {
@@ -160,11 +160,11 @@ const BalancesTab = () => {
         } finally {
           setLoading(false);
         }
-      };
+      }, [selectedSubaccount, driftClient, formatTokenAmount]);
       
       useEffect(() => {
         refreshBalances();
-      }, [selectedSubaccount, driftClient]);
+      }, [refreshBalances]);
     
       if (!selectedSubaccount) {
         return (

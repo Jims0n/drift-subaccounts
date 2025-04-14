@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/app/useAppStore';
-import { OrderStatus, OrderType } from '@drift-labs/sdk';
+import { OrderStatus, OrderType, DriftOrder } from '@drift-labs/sdk';
 
 
 interface OrderData {
@@ -12,7 +12,6 @@ interface OrderData {
     status: string;
     timeInForce: string;
   }
-
 
 const OpenOrdersTab = () => {
     const { selectedSubaccount } = useAppStore();
@@ -27,7 +26,7 @@ const OpenOrdersTab = () => {
           const openOrders = selectedSubaccount.getOpenOrders();
           
           // Format the orders
-          const formattedOrders = openOrders.map(order => {
+          const formattedOrders = openOrders.map((order: DriftOrder) => {
             try {
               // Map order type to readable string
               let orderType = 'Unknown';
