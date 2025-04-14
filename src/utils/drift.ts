@@ -129,6 +129,3 @@ export const createConnection = (endpoint: string): Connection => {
   }
 };
 
-// Helius RPC endpoint (replace the placeholder with your actual API key)
-// Sign up at https://helius.dev/ to get an API key
-export const HELIUS_RPC_ENDPOINT = ''; 

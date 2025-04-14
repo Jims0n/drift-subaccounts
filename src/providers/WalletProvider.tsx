@@ -17,6 +17,7 @@ import { clusterApiUrl } from '@solana/web3.js';
 // Import the wallet adapter CSS
 import '@solana/wallet-adapter-react-ui/styles.css';
 import useSyncWalletToStore from '@/hooks/useSyncWalletToStore';
+import useSyncStores from '@/hooks/useSyncStores';
 
 interface WalletProviderProps {
   children: React.ReactNode;
@@ -61,8 +62,9 @@ export const WalletProvider = ({ children }: WalletProviderProps) => {
   );
 };
 
-// This component just makes sure to sync the wallet state to our store
+// This component just makes sure to sync the wallet state
 const WalletSyncEffect = () => {
   useSyncWalletToStore();
+  useSyncStores();
   return null;
 }; 

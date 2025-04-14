@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { WalletProvider } from "@/providers/WalletProvider";
 import FloatingUi from "@/components/modals/FloatingUi";
+import ConnectionInitializer from "@/components/ConnectionInitializer";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
@@ -16,8 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body className="bg-[#03040F]">
         <WalletProvider>
+          <ConnectionInitializer />
           {children}
           {/** Floating Content */}
           <FloatingUi />
