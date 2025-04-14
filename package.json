@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@drift-labs/sdk": "file:./drift-protocol-v2/sdk",
     "@radix-ui/react-slot": "^1.2.0",
     "@solana/wallet-adapter-base": "^0.9.24",
     "@solana/wallet-adapter-react": "^0.15.36",
