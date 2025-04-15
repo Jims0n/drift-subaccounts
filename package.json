@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "install-vercel": "sh ./scripts/install-vercel.sh",
+    "build-vercel": "sh ./scripts/build-vercel.sh"
   },
   "dependencies": {
     "@drift-labs/sdk": "file:./drift-protocol-v2/sdk",
