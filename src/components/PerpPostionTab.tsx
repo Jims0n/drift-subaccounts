@@ -386,19 +386,33 @@ const PerpPositionTab = () => {
 
       // Handle opening the TP/SL form
       const handleOpenTpSlForm = (position: PositionData) => {
-        // Find the market index from the market name
-        const marketEntry = Object.entries(MARKET_MAPPING).find(
-          ([, val]) => val.name === position.market
-        );
+        console.log('Opening TP/SL form for position:', position);
         
-        const marketIndex = marketEntry ? parseInt(marketEntry[0], 10) : 0;
+        // Use the marketIndex that's already in the position data
+        // Only fall back to looking it up if absolutely necessary
+        let marketIndex = position.marketIndex;
+        
+        // If marketIndex is somehow missing, try to look it up (fallback)
+        if (marketIndex === undefined || marketIndex === null) {
+          console.warn('Position missing marketIndex, attempting to look up by name:', position.market);
+          const marketEntry = Object.entries(MARKET_MAPPING).find(
+            ([, val]) => val.name === position.market
+          );
+          
+          marketIndex = marketEntry ? parseInt(marketEntry[0], 10) : 0;
+          console.log('Looked up marketIndex:', marketIndex);
+        }
+        
         const markPriceValue = parseFloat(position.markPrice.replace('$', ''));
         
-        setSelectedPosition({
+        const positionForForm: Position = {
           ...position,
           marketIndex,
           markPriceValue
-        });
+        };
+        
+        console.log('Setting selected position for TP/SL form:', positionForForm);
+        setSelectedPosition(positionForForm);
         setIsTpSlModalOpen(true);
       };
     

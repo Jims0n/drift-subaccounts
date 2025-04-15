@@ -25,18 +25,24 @@ const MARKET_MAPPING: Record<number, { name: string; baseDecimals: number; quote
 // Constants for price scaling
 const PRICE_PRECISION = 6; // Standard price precision in Drift protocol
 
-// Define MarketType enum since it's not exported by the SDK type definitions
-enum MarketType {
-  SPOT = 0,
-  PERP = 1
-}
-
-// Define OrderTriggerCondition enum since it's not exported by the SDK type definitions
-enum OrderTriggerCondition {
+// Define constants for trigger conditions since they might not be exported by the SDK
+enum TriggerCondition {
   ABOVE = 0,
   BELOW = 1,
   TRIGGERED_ABOVE = 2,
   TRIGGERED_BELOW = 3
+}
+
+// Define an interface for order parameters
+interface OrderParams {
+  marketIndex: number;
+  direction: string;
+  baseAssetAmount: BN;
+  price: BN;
+  orderType: number;
+  reduceOnly: boolean;
+  triggerPrice: BN;
+  triggerCondition: number;
 }
 
 interface Position {
@@ -74,9 +80,30 @@ const TakeProfitStopLossForm: React.FC<TakeProfitStopLossFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [marketInfo, setMarketInfo] = useState<{ baseDecimals: number; quoteDecimals: number } | null>(null);
   
+  // Log when the component receives a position
+  useEffect(() => {
+    console.log('TakeProfitStopLossForm received position:', position);
+  }, [position]);
+  
   // Set defaults when position changes
   useEffect(() => {
-    if (!position) return;
+    if (!position) {
+      console.warn('No position data provided to TakeProfitStopLossForm');
+      return;
+    }
+    
+    // Validate required fields
+    if (position.marketIndex === undefined || position.marketIndex === null) {
+      console.error('Position missing market index:', position);
+    }
+    
+    if (!position.market) {
+      console.error('Position missing market name:', position);
+    }
+    
+    if (!position.direction) {
+      console.error('Position missing direction:', position);
+    }
     
     // Extract the mark price value (remove $ and convert to number)
     const markPriceNumber = position.markPriceValue;
@@ -153,7 +180,7 @@ const TakeProfitStopLossForm: React.FC<TakeProfitStopLossFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedSubaccount || !driftClient || !position || !marketInfo) {
+    if (!selectedSubaccount || !driftClient) {
       toast.error('Missing required data. Please try again.');
       return;
     }
@@ -170,7 +197,7 @@ const TakeProfitStopLossForm: React.FC<TakeProfitStopLossFormProps> = ({
     
     if (!validatePrices()) {
       toast.error(
-        position.direction === 'Long'
+        position?.direction === 'Long'
           ? 'Take profit price must be higher than current price and stop loss must be lower than current price'
           : 'Take profit price must be lower than current price and stop loss must be higher than current price'
       );
@@ -180,35 +207,32 @@ const TakeProfitStopLossForm: React.FC<TakeProfitStopLossFormProps> = ({
     setIsSubmitting(true);
     
     try {
-      // Cast to access placeTriggerOrder method dynamically
-      const subaccountAny = selectedSubaccount as unknown as Record<string, unknown>;
-      const hasPlaceTriggerOrder = typeof subaccountAny.placeTriggerOrder === 'function';
-      const hasPlacePerpTriggerOrder = typeof subaccountAny.placePerpTriggerOrder === 'function';
+      // Get the market index from the position
+      const marketIndex = position?.marketIndex;
+      console.log('Position data:', position);
+      console.log('Market index:', marketIndex);
       
-      // Check if we can place trigger orders
-      if (!hasPlaceTriggerOrder && !hasPlacePerpTriggerOrder) {
-        toast.error('Trigger orders are not supported by the current SDK version');
+      // Specifically check if market index is undefined or null, allow valid index 0
+      if (marketIndex === undefined || marketIndex === null) {
+        toast.error('Invalid market index');
         return;
       }
       
-      // Get the trigger order placement function
-      const placeTriggerOrderFn = (hasPlaceTriggerOrder 
-        ? subaccountAny.placeTriggerOrder 
-        : subaccountAny.placePerpTriggerOrder) as (
-        params: {
-          marketIndex: number;
-          direction: string;
-          baseAssetAmount: BN;
-          triggerPrice: BN;
-          triggerCondition: number;
-          orderType: number;
-          marketType?: number;
-          reduceOnly?: boolean;
-        }
-      ) => Promise<unknown>;
+      // Check if the User object has a method for placing orders
+      const subaccountAny = selectedSubaccount as unknown as Record<string, unknown>;
+      const hasPerpOrder = typeof subaccountAny.placePerpOrder === 'function';
+      const hasPlaceOrder = typeof subaccountAny.placeOrder === 'function';
       
-      // Setup for both orders
-      const marketIndex = position.marketIndex;
+      // Check if we can place orders
+      if (!hasPerpOrder && !hasPlaceOrder) {
+        toast.error('Order placement is not supported by the current SDK version');
+        return;
+      }
+      
+      // Get the order placement function
+      const placeOrderFn = (hasPlaceOrder 
+        ? subaccountAny.placeOrder 
+        : subaccountAny.placePerpOrder) as (params: OrderParams) => Promise<unknown>;
       
       // For take profit
       if (isSettingTakeProfit) {
@@ -225,27 +249,30 @@ const TakeProfitStopLossForm: React.FC<TakeProfitStopLossFormProps> = ({
         // Determine trigger condition based on position direction
         // For long positions, take profit triggers when price goes ABOVE the trigger price
         // For short positions, take profit triggers when price goes BELOW the trigger price
-        const tpTriggerCondition = position.direction === 'Long' 
-          ? OrderTriggerCondition.ABOVE 
-          : OrderTriggerCondition.BELOW;
+        const tpTriggerCondition = position?.direction === 'Long' 
+          ? TriggerCondition.ABOVE 
+          : TriggerCondition.BELOW;
         
         // Direction is opposite of the position direction for closing
-        const tpDirection = position.direction === 'Long' ? 'short' : 'long';
+        const tpDirection = position?.direction === 'Long' ? 'short' : 'long';
         
-        console.log(`Placing take profit trigger order for ${position.market} at ${takeProfitPrice}`);
+        console.log(`Placing take profit trigger order for ${position?.market} at ${takeProfitPrice}`);
         
         try {
-          // Place take profit order
-          await placeTriggerOrderFn({
-            marketIndex,
+          // Create order parameters
+          const orderParams: OrderParams = {
+            marketIndex: marketIndex,
             direction: tpDirection,
             baseAssetAmount: tpBaseAssetAmount,
+            price: tpPrice,
+            orderType: OrderType.TRIGGER_MARKET,
+            reduceOnly: true, // Ensure it only reduces the position
             triggerPrice: tpPrice,
             triggerCondition: tpTriggerCondition,
-            orderType: OrderType.TRIGGER_MARKET,
-            marketType: MarketType.PERP,
-            reduceOnly: true // Ensure it only reduces the position
-          });
+          };
+          
+          // Place the order
+          await placeOrderFn(orderParams);
           
           toast.success(`Take profit order placed at ${takeProfitPrice}`);
         } catch (error) {
@@ -269,27 +296,30 @@ const TakeProfitStopLossForm: React.FC<TakeProfitStopLossFormProps> = ({
         // Determine trigger condition based on position direction
         // For long positions, stop loss triggers when price goes BELOW the trigger price
         // For short positions, stop loss triggers when price goes ABOVE the trigger price
-        const slTriggerCondition = position.direction === 'Long' 
-          ? OrderTriggerCondition.BELOW 
-          : OrderTriggerCondition.ABOVE;
+        const slTriggerCondition = position?.direction === 'Long' 
+          ? TriggerCondition.BELOW 
+          : TriggerCondition.ABOVE;
         
         // Direction is opposite of the position direction for closing
-        const slDirection = position.direction === 'Long' ? 'short' : 'long';
+        const slDirection = position?.direction === 'Long' ? 'short' : 'long';
         
-        console.log(`Placing stop loss trigger order for ${position.market} at ${stopLossPrice}`);
+        console.log(`Placing stop loss trigger order for ${position?.market} at ${stopLossPrice}`);
         
         try {
-          // Place stop loss order
-          await placeTriggerOrderFn({
-            marketIndex,
+          // Create order parameters
+          const orderParams: OrderParams = {
+            marketIndex: marketIndex,
             direction: slDirection,
             baseAssetAmount: slBaseAssetAmount,
+            price: slPrice,
+            orderType: OrderType.TRIGGER_MARKET,
+            reduceOnly: true, // Ensure it only reduces the position
             triggerPrice: slPrice,
             triggerCondition: slTriggerCondition,
-            orderType: OrderType.TRIGGER_MARKET,
-            marketType: MarketType.PERP,
-            reduceOnly: true // Ensure it only reduces the position
-          });
+          };
+          
+          // Place the order
+          await placeOrderFn(orderParams);
           
           toast.success(`Stop loss order placed at ${stopLossPrice}`);
         } catch (error) {
