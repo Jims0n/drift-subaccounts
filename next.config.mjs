@@ -25,12 +25,18 @@ const nextConfig = {
       config.resolve.alias = {};
     }
     
-    // Use simple relative paths instead of path.resolve
-    config.resolve.alias['rpc-websockets/dist/lib/client'] = './rpc-websockets-resolve.js';
-    config.resolve.alias['rpc-websockets/dist/lib/client/websocket'] = './rpc-websockets-resolve.js';
-    config.resolve.alias['fs'] = './node-browser-compatibility.js';
-    config.resolve.alias['net'] = './node-browser-compatibility.js';
-    config.resolve.alias['tls'] = './node-browser-compatibility.js';
+    // Using relative paths to avoid require()
+    const rpcWebSocketsShim = new URL('./rpc-websockets-resolve.js', import.meta.url).pathname;
+    const nodeCompatShim = new URL('./node-browser-compatibility.js', import.meta.url).pathname;
+    
+    // Handle rpc-websockets resolution issue
+    config.resolve.alias['rpc-websockets/dist/lib/client'] = rpcWebSocketsShim;
+    config.resolve.alias['rpc-websockets/dist/lib/client/websocket'] = rpcWebSocketsShim;
+    
+    // Provide shims for Node.js specific modules
+    config.resolve.alias['fs'] = nodeCompatShim;
+    config.resolve.alias['net'] = nodeCompatShim;
+    config.resolve.alias['tls'] = nodeCompatShim;
 
     return config;
   },
@@ -51,4 +57,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig; 
+export default nextConfig; 

@@ -49,9 +49,9 @@ build_package "./drift-protocol-v2/sdk" "build:browser" "npm install @project-se
 # Return to base directory
 cd "${base_directory}"
 
-# Install rpc-websockets fix for module resolution
-print "Installing rpc-websockets fix"
-print_exec_command "${SCRIPT_NAME}" "npm install rpc-websockets@7.5.1 --legacy-peer-deps"
+# Install necessary webpack polyfills
+print "Installing webpack polyfills"
+print_exec_command "${SCRIPT_NAME}" "npm install rpc-websockets@7.5.1 crypto-browserify stream-browserify path-browserify browserify-zlib stream-http https-browserify os-browserify buffer process --legacy-peer-deps"
 
 # Build main application
 print "Building main application"

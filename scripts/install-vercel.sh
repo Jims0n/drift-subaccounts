@@ -61,6 +61,10 @@ install_and_link "./drift-protocol-v2/sdk" "true"
 print "Installing main application dependencies"
 install_and_link "." "false" "@drift-labs/sdk"
 
+# Install polyfills explicitly
+print "Installing browser polyfills"
+print_exec_command "${SCRIPT_NAME}" "npm install browserify-zlib buffer crypto-browserify https-browserify os-browserify path-browserify process stream-browserify stream-http --legacy-peer-deps"
+
 # Get the end time
 end_time=$(date +%s)
 
