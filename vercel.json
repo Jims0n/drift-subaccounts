@@ -2,7 +2,7 @@
   "buildCommand": "next build",
   "devCommand": "next dev",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
+  "installCommand": "yarn install",
   "framework": "nextjs",
   "regions": ["iad1"],
   "headers": [
