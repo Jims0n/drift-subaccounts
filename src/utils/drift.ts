@@ -1,26 +1,5 @@
+import { DriftClient, DriftClientConfig, DriftEnv, initialize, BulkAccountLoader } from '@drift-labs/sdk';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
-
-// Import types only
-type DriftClient = any;
-type DriftClientConfig = any;
-type DriftEnv = 'mainnet-beta' | 'devnet';
-type BulkAccountLoader = any;
-
-// Dynamically import the drift SDK to avoid SSR issues
-const getDriftSDK = async () => {
-  // Use dynamic import to prevent SSR issues
-  try {
-    const driftSDK = await import('@drift-labs/sdk');
-    return {
-      DriftClient: driftSDK.DriftClient,
-      initialize: driftSDK.initialize,
-      BulkAccountLoader: driftSDK.BulkAccountLoader
-    };
-  } catch (error) {
-    console.error('Error importing Drift SDK:', error);
-    throw new Error(`Failed to import Drift SDK: ${error instanceof Error ? error.message : String(error)}`);
-  }
-};
 
 // Initialize the drift client with a connection
 export const initializeDriftClient = async (
@@ -33,9 +12,6 @@ export const initializeDriftClient = async (
     console.log('Environment:', env);
     console.log('Connection endpoint:', connection.rpcEndpoint);
     console.log('Wallet public key:', walletPubKey?.toString() || 'none');
-    
-    // Dynamically import the SDK
-    const { DriftClient, initialize, BulkAccountLoader } = await getDriftSDK();
     
     // Initialize the SDK
     console.log('Initializing Drift SDK...');
@@ -58,26 +34,59 @@ export const initializeDriftClient = async (
     // Different configuration based on environment
     let config: DriftClientConfig;
     
-    // Use a simplified configuration to avoid dependency issues
-    config = {
-      connection,
-      wallet: dummyWallet,
-      env,
-      opts: {
-        skipPreflight: false,
-        commitment: 'confirmed',
-      },
-      activeSubAccountId: 0,
-      userStats: false,
-      accountSubscription: {
-        type: isBrowser ? 'websocket' : 'polling',
-        resubTimeoutMs: 30000,
-        commitment: 'confirmed',
-      },
-    };
+    if (isBrowser) {
+      // Browser configuration
+      console.log('Using browser-compatible configuration (no account loader)');
+      config = {
+        connection,
+        wallet: dummyWallet,
+        env,
+        opts: {
+          skipPreflight: false,
+          commitment: 'confirmed',
+        },
+        activeSubAccountId: 0,
+        userStats: false,
+        accountSubscription: {
+          type: 'websocket',
+          resubTimeoutMs: 30000,
+          commitment: 'confirmed',
+        },
+      };
+    } else {
+      // Server configuration with proper account loader
+      console.log('Using server configuration with BulkAccountLoader');
+      const accountLoader = new BulkAccountLoader(
+        connection,
+        'confirmed',
+        5000 // polling frequency in ms
+      );
+      
+      config = {
+        connection,
+        wallet: dummyWallet,
+        env,
+        opts: {
+          skipPreflight: false,
+          commitment: 'confirmed',
+        },
+        activeSubAccountId: 0,
+        userStats: false,
+        accountSubscription: {
+          type: 'polling',
+          accountLoader,
+        },
+      };
+    }
 
     // Create the client
-    console.log('Creating DriftClient instance');
+    console.log('Creating DriftClient instance with config:', JSON.stringify({
+      env: config.env,
+      activeSubAccountId: config.activeSubAccountId,
+      connection: 'Connection object',
+      wallet: 'Wallet object',
+      accountSubscription: config.accountSubscription ? 'configured' : 'undefined'
+    }, null, 2));
     
     const driftClient = new DriftClient(config);
     console.log('DriftClient instance created successfully');

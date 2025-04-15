@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm run build-vercel",
-  "devCommand": "npm run dev",
-  "outputDirectory": ".next/standalone",
-  "installCommand": "npm run install-vercel",
+  "buildCommand": "next build",
+  "devCommand": "next dev",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],
   "headers": [
