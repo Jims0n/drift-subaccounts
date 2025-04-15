@@ -2,6 +2,7 @@
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
+  output: 'standalone',
   webpack: (config) => {
     // Add fallbacks for Node.js modules
     config.resolve.fallback = {

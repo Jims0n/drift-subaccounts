@@ -57,6 +57,12 @@ print_exec_command "${SCRIPT_NAME}" "npm install rpc-websockets@7.5.1 crypto-bro
 print "Building main application"
 build_package "." "build"
 
+# Copy necessary files for standalone output
+print "Preparing standalone output"
+print_exec_command "${SCRIPT_NAME}" "mkdir -p .next/standalone/public"
+print_exec_command "${SCRIPT_NAME}" "cp -r public/* .next/standalone/public/"
+print_exec_command "${SCRIPT_NAME}" "cp -r .next/static .next/standalone/.next/"
+
 # Get the end time
 end_time=$(date +%s)
 
