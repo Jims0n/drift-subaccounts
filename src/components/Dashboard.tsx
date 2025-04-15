@@ -1,147 +1,146 @@
 'use client'
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAppStore } from '@/stores/app/useAppStore';
 import BalancesTab from './BalancesTab';
 import OpenOrdersTab from './OpenOrdersTab';
 import PerpPostionTab from './PerpPostionTab';
-
-
+import DepositWithdrawForm from './DepositWithdrawForm';
+import PerpOrderForm from './PerpOrderForm';
 
 export default function Dashboard() {
   const { 
     subaccounts, 
     selectedSubaccount, 
     setSelectedSubaccount,
-    activeTab,
-    setActiveTab,
-    walletPublicKey,
-    customWalletAddress,
     connection,
     driftClient
   } = useAppStore();
-
-  const [walletDisplay, setWalletDisplay] = useState('');
-
-  useEffect(() => {
-    // Set display for the wallet we're viewing (connected or custom)
-    if (walletPublicKey) {
-      setWalletDisplay(abbreviateAddress(walletPublicKey.toString()));
-    } else if (customWalletAddress) {
-      setWalletDisplay(abbreviateAddress(customWalletAddress));
-    }
-  }, [walletPublicKey, customWalletAddress]);
-
-  // Helper to abbreviate addresses
-  const abbreviateAddress = (address: string) => {
-    if (!address) return '';
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
-  };
-
-  // Render the active tab
-  const renderTabContent = () => {
-    if (!selectedSubaccount) {
-      return (
-        <div className="p-4 text-center text-gray-400">
-          {subaccounts.length === 0 
-            ? "No subaccounts found for this wallet. You may need to create a subaccount first at app.drift.trade."
-            : "Please select a subaccount to view details."}
-        </div>
-      );
-    }
-
-    switch (activeTab) {
-      case 'balances':
-        return <BalancesTab />;
-      case 'positions':
-        return <PerpPostionTab />;
-      case 'orders':
-        return <OpenOrdersTab />;
-      default:
-        return <BalancesTab />;
-    }
-  };
+  
+  const [showDepositForm, setShowDepositForm] = useState(false);
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
 
   // If no connection or client is established
   if (!connection || !driftClient) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-lg text-gray-500">Connecting to Drift Protocol...</p>
+      <div className="flex justify-center items-center h-screen bg-[#03040F]">
+        <div className="animate-pulse text-lg text-gray-400">Connecting to Drift Protocol...</div>
       </div>
     );
   }
 
+  const getSubaccountName = (index: number) => {
+    return `SubAccount ${index + 1}`;
+  };
+
   return (
-    <div className="w-full max-w-4xl">
-      {/* Wallet info */}
-      <div className="mb-6 p-4 bg-slate-800/50 rounded-lg">
-        <h2 className="text-xl font-semibold mb-2">Wallet: {walletDisplay}</h2>
-        
-        {/* Subaccount selector */}
-        {subaccounts.length > 0 && (
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Subaccount:
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {subaccounts.map((subaccount, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedSubaccount(subaccount)}
-                  className={`px-3 py-1 rounded-md ${
-                    selectedSubaccount === subaccount
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
-                  }`}
-                >
-                  Subaccount {index}
-                </button>
-              ))}
-            </div>
+    <div>
+      
+      {/* Subaccount Selection */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+        <div className="flex items-center">
+          <span className="text-gray-400 mr-4">Select Subaccount:</span>
+          <div className="flex space-x-2">
+            {subaccounts.map((subaccount, index) => (
+              <button
+                key={index}
+                onClick={() => setSelectedSubaccount(subaccount)}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  selectedSubaccount === subaccount
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-[#1E2131] text-gray-300 hover:bg-[#2A2E45]'
+                }`}
+              >
+                {getSubaccountName(index)}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
+        <button className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
+          <span className="mr-1">+</span> Create
+        </button>
       </div>
 
-      {/* Tabs */}
-      <div className="mb-4 border-b border-gray-700">
-        <div className="flex space-x-4">
-          <button
-            onClick={() => setActiveTab('balances')}
-            className={`py-2 px-4 ${
-              activeTab === 'balances'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Balances
-          </button>
-          <button
-            onClick={() => setActiveTab('positions')}
-            className={`py-2 px-4 ${
-              activeTab === 'positions'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Positions
-          </button>
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`py-2 px-4 ${
-              activeTab === 'orders'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Orders
-          </button>
+      {/* Main Content - Three Column Layout */}
+      <div className="flex flex-1 p-6 gap-4">
+        {/* Balances Section */}
+        <div className="flex-1 bg-[#0F1120] rounded-lg overflow-hidden shadow-lg">
+          <div className="p-4 border-b border-gray-800">
+            <h2 className="text-lg font-medium">Balances {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+          </div>
+          <div className="p-4">
+            <BalancesTab />
+          </div>
+          
+          {/* Actions */}
+          <div className="p-4 flex gap-2">
+            <button 
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+              onClick={() => setShowDepositForm(true)}
+            >
+              Deposit
+            </button>
+            <button 
+              className="bg-[#1E2131] hover:bg-[#2A2E45] text-white px-4 py-2 rounded-md transition-colors"
+              onClick={() => setShowWithdrawForm(true)}
+            >
+              Withdraw
+            </button>
+          </div>
+          
+          {/* Open Orders */}
+          <div className="p-4 border-t border-gray-800">
+            <h2 className="text-lg font-medium mb-4">Open Orders {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+            <OpenOrdersTab />
+          </div>
+        </div>
+
+        {/* Perpetual Positions Section */}
+        <div className="flex-1 bg-[#0F1120] rounded-lg overflow-hidden shadow-lg">
+          <div className="p-4 border-b border-gray-800">
+            <h2 className="text-lg font-medium">Perpetual Positions {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+          </div>
+          <div className="p-4">
+            <PerpPostionTab />
+          </div>
+        </div>
+
+        {/* Place Order Section */}
+        <div className="flex-1 bg-[#0F1120] rounded-lg overflow-hidden shadow-lg">
+          <div className="p-4 border-b border-gray-800">
+            <h2 className="text-lg font-medium">Place Order {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+          </div>
+          <div className="p-6">
+            <PerpOrderForm />
+          </div>
         </div>
       </div>
 
-      {/* Tab content */}
-      <div className="bg-slate-800/30 rounded-lg">
-        {renderTabContent()}
-      </div>
+      {/* Modal for Deposit Form */}
+      {showDepositForm && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowDepositForm(false)}></div>
+          <div className="z-10">
+            <DepositWithdrawForm 
+              action="deposit" 
+              onClose={() => setShowDepositForm(false)} 
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Withdraw Form */}
+      {showWithdrawForm && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowWithdrawForm(false)}></div>
+          <div className="z-10">
+            <DepositWithdrawForm 
+              action="withdraw" 
+              onClose={() => setShowWithdrawForm(false)} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
