@@ -28,7 +28,7 @@ export default function Dashboard() {
   // If no connection or client is established
   if (!connection || !driftClient) {
     return (
-      <div className="flex justify-center items-center h-screen bg-[#03040F]">
+      <div className="flex justify-center items-center  bg-[#03040F]">
         <div className="animate-pulse text-lg text-gray-400">Connecting to Drift Protocol...</div>
       </div>
     );
