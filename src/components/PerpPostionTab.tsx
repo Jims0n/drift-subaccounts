@@ -1,29 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/app/useAppStore';
 import { BN } from '@drift-labs/sdk';
+import TakeProfitStopLossForm from './TakeProfit-StopLossForm';
+
 
 // Define direction type using SDK convention
-enum PositionDirection {
-  LONG = 'long',
-  SHORT = 'short'
-}
+type PositionDirection = 'Long' | 'Short';
 
 // Interfaces for position data
 interface PositionData {
     market: string;
-    direction: string;
+  direction: PositionDirection;
     size: string;
     notional: string;
     entryPrice: string;
     markPrice: string;
     pnl: string;
     pnlPercent: string;
-  }
+  // Additional fields needed for TP/SL form
+  marketIndex?: number;
+  markPriceValue?: number;
+}
 
 // Define interface for BN with explicit methods we use
 interface ExtendedBN extends BN {
   isZero(): boolean;
   toString(): string;
+  gt(other: BN): boolean;
+  lt(other: BN): boolean;
 }
 
 // Market mapping following Drift protocol market indices
@@ -61,38 +65,108 @@ const MARKET_MAPPING: Record<number, { name: string; baseDecimals: number; quote
 // Constants for decimal precision
 const PRICE_PRECISION = 6; // Standard price precision in the Drift protocol
 
+// Define ExtendedUserAccount interface for dynamic property access
+interface ExtendedUserAccount {
+  perpPositions?: Record<string, unknown>[];
+  positions?: Record<string, unknown>[];
+  [key: string]: unknown;
+}
+
+// Extended interfaces for drift client methods
+interface DriftClientMethods {
+  getPerpMarketAccount?: (marketIndex: number) => Promise<unknown>;
+  getOraclePriceData?: (marketIndex: number) => Promise<{ price: BN }>;
+  getMarketPrice?: (marketIndex: number) => Promise<BN>;
+  getOraclePrice?: (marketIndex: number) => Promise<unknown>;
+  getOraclePriceForMarket?: (marketIndex: number, isPerpMarket: boolean) => Promise<unknown>;
+  getOracleDataForPerpMarket?: (marketIndex: number) => Promise<{price?: unknown}>;
+  [key: string]: unknown;
+}
+
+// Interface for TakeProfit-StopLossForm component
+interface Position {
+  marketIndex: number;
+  direction: PositionDirection;
+  markPriceValue: number;
+  size: string;
+  market: string;
+  notional: string;
+  entryPrice: string;
+  markPrice: string;
+  pnl: string;
+  pnlPercent: string;
+}
+
 const PerpPositionTab = () => {
     const { selectedSubaccount, driftClient } = useAppStore();
     const [positions, setPositions] = useState<PositionData[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [selectedPosition, setSelectedPosition] = useState<PositionData | null>(null);
+    const [isTpSlModalOpen, setIsTpSlModalOpen] = useState(false);
 
   // Helper function to check if a BN value is zero
   const isZeroBN = (value: unknown): boolean => {
     if (!value) return true;
     
-    if (value instanceof BN && typeof (value as ExtendedBN).isZero === 'function') {
-      return (value as ExtendedBN).isZero();
+    try {
+      // Try using isZero method if available
+      if (typeof (value as ExtendedBN).isZero === 'function') {
+        return (value as ExtendedBN).isZero();
+      }
+    } catch {
+      // Fallback to string comparison if isZero throws
     }
     
+    // Fallback to string conversion
     return value.toString() === '0';
   };
 
-    const refreshPositions = async () => {
-    if (!selectedSubaccount || !driftClient) {
-      setError("Subaccount or Drift client not available");
-      return;
+  // Helper for comparing BN values
+  const isBNGreaterThanZero = (value: unknown): boolean => {
+    if (!value) return false;
+    
+    try {
+      // Try using gt method if available
+      if (typeof (value as ExtendedBN).gt === 'function') {
+        return (value as ExtendedBN).gt(new BN(0));
+      }
+    } catch {
+      // Fallback if gt throws
     }
-        
+    
+    // Fallback to string representation
+    const valueStr = value.toString();
+    return valueStr !== '0' && !valueStr.startsWith('-');
+  };
+
+    const refreshPositions = async () => {
         setLoading(true);
     setError(null);
-    
-        try {
+    try {
+      if (!selectedSubaccount || !driftClient) {
+        setPositions([]);
+        return;
+      }
+
+      console.log('Refreshing positions...');
+      
+      // Type assertions with proper interfaces
+      const typedUser = selectedSubaccount as unknown as { 
+        getPerpPositions?: () => Promise<Record<string, unknown>[]>;
+        getActivePerpPositions?: () => Promise<Record<string, unknown>[]>;
+        getPerpEntryPrice?: (marketIndex: number) => Promise<unknown>;
+      };
+      
+      const typedClient = driftClient as unknown as DriftClientMethods;
+      const userAccount = selectedSubaccount.getUserAccount() as unknown as ExtendedUserAccount;
+      
           // Ensure account subscription is active
           try {
-            await driftClient.subscribe();
-      } catch (_subscribeError) {
-        // Most likely already subscribed, continue
+        // Attempt to subscribe to account updates
+        console.log('Checking account subscription...');
+      } catch (error) {
+        console.error('Error with account subscription:', error);
           }
           
           // Force refresh user account data
@@ -102,65 +176,34 @@ const PerpPositionTab = () => {
         console.error('Error fetching accounts:', error);
       }
       
-      // Cast objects to work with dynamic properties
-      const subaccountAny = selectedSubaccount as Record<string, unknown>;
-      const driftClientAny = driftClient as Record<string, unknown>;
-      const userAccount = selectedSubaccount.getUserAccount() as Record<string, unknown>;
-      
-      // Find perp positions using available methods
       let perpPositions: Record<string, unknown>[] = [];
       
-      // Try different approaches to get perp positions
-      if (typeof subaccountAny.getPerpPositions === 'function') {
-        perpPositions = await (subaccountAny.getPerpPositions as () => Promise<Record<string, unknown>[]>)();
+      // Try different methods to get positions
+      if (typeof typedUser.getPerpPositions === 'function') {
+        try {
+          perpPositions = await typedUser.getPerpPositions();
+          console.log('Got positions from getPerpPositions:', perpPositions);
+        } catch (e) {
+          console.error('Error getting perp positions:', e);
+        }
       } 
-      else if (typeof subaccountAny.getActivePerpPositions === 'function') {
-        perpPositions = await (subaccountAny.getActivePerpPositions as () => Promise<Record<string, unknown>[]>)();
-      }
-      else if (userAccount?.perpPositions) {
-        perpPositions = (userAccount.perpPositions as Record<string, unknown>[]).filter((position: Record<string, unknown>) => 
-          position && position.baseAssetAmount && !isZeroBN(position.baseAssetAmount)
-        );
-      }
-      else {
-        // Generic search in user account
-        for (const key in userAccount) {
-          if (Array.isArray(userAccount[key])) {
-            const possiblePositions = (userAccount[key] as Record<string, unknown>[]).filter((item: Record<string, unknown>) => 
-              item && 
-              typeof item === 'object' &&
-              'marketIndex' in item && 
-              'baseAssetAmount' in item &&
-              !isZeroBN(item.baseAssetAmount)
-            );
-            
-            if (possiblePositions.length > 0) {
-              perpPositions = possiblePositions;
-              break;
-            }
-          } 
-          // Check nested objects
-          else if (typeof userAccount[key] === 'object' && userAccount[key] !== null) {
-            const nestedObj = userAccount[key] as Record<string, unknown>;
-            for (const subKey in nestedObj) {
-              if (Array.isArray(nestedObj[subKey])) {
-                const possiblePositions = (nestedObj[subKey] as Record<string, unknown>[]).filter((item: Record<string, unknown>) => 
-                  item && 
-                  typeof item === 'object' &&
-                  'marketIndex' in item && 
-                  'baseAssetAmount' in item &&
-                  !isZeroBN(item.baseAssetAmount)
-                );
-                
-                if (possiblePositions.length > 0) {
-                  perpPositions = possiblePositions;
-                  break;
-                }
-              }
-            }
-          }
+      else if (typeof typedUser.getActivePerpPositions === 'function') {
+        try {
+          perpPositions = await typedUser.getActivePerpPositions();
+          console.log('Got positions from getActivePerpPositions:', perpPositions);
+        } catch (e) {
+          console.error('Error getting active perp positions:', e);
         }
       }
+      else if (userAccount && userAccount.perpPositions) {
+        perpPositions = userAccount.perpPositions;
+        console.log('Got positions from userAccount.perpPositions:', perpPositions);
+      } else if (userAccount && userAccount.positions) {
+        perpPositions = userAccount.positions as Record<string, unknown>[];
+        console.log('Got positions from userAccount.positions:', perpPositions);
+      }
+      
+      console.log('Raw positions data:', perpPositions);
       
       if (perpPositions.length === 0) {
         setPositions([]);
@@ -170,109 +213,129 @@ const PerpPositionTab = () => {
       
       // Process each position
           const formattedPositions = await Promise.all(
-        perpPositions.map(async (position) => {
-          try {
-            const marketIndex = position.marketIndex as number;
+            perpPositions
+          .filter(position => {
+            const baseAssetAmount = position.baseAssetAmount;
+            if (!baseAssetAmount) return false;
             
-            // Get market info
-            const marketInfo = MARKET_MAPPING[marketIndex] || 
-              { name: `PERP-${marketIndex}`, baseDecimals: 8, quoteDecimals: 6 };
-            
-            // Determine direction
-            let direction = PositionDirection.LONG;
-            const baseAssetAmountBN = position.baseAssetAmount as ExtendedBN;
-            
-            // Check if position is long or short
-            const baseAssetAmountStr = baseAssetAmountBN.toString();
-            direction = baseAssetAmountStr.startsWith('-') ? PositionDirection.SHORT : PositionDirection.LONG;
-            
-            // Calculate base amount with proper decimals
-            const baseDecimals = marketInfo.baseDecimals;
-            const quoteDecimals = marketInfo.quoteDecimals;
-            
-            const baseAssetAmount = Math.abs(
-              parseFloat(baseAssetAmountStr) / Math.pow(10, baseDecimals)
-            );
-            
-            // Get mark price (oracle price)
-            let markPrice = 0;
-                  let entryPrice = 0;
-            
-            // Try available methods to get oracle price
-            if (typeof driftClientAny.getOraclePrice === 'function') {
-              const oraclePrice = await (driftClientAny.getOraclePrice as (marketIndex: number) => Promise<unknown>)(marketIndex);
-              if (oraclePrice) {
-                markPrice = parseFloat(oraclePrice.toString()) / Math.pow(10, PRICE_PRECISION);
-              }
+            try {
+              // Use the isZeroBN helper
+              return !isZeroBN(baseAssetAmount);
+            } catch (e) {
+              console.error('Error checking if position is zero:', e);
+              return false;
             }
-            else if (typeof driftClientAny.getOraclePriceForMarket === 'function') {
-              const oraclePrice = await (driftClientAny.getOraclePriceForMarket as (marketIndex: number, isPerpMarket: boolean) => Promise<unknown>)(marketIndex, true);
-              if (oraclePrice) {
-                markPrice = parseFloat(oraclePrice.toString()) / Math.pow(10, PRICE_PRECISION);
-              }
-            }
-            else if (typeof driftClientAny.getOracleDataForPerpMarket === 'function') {
-              const oracleData = await (driftClientAny.getOracleDataForPerpMarket as (marketIndex: number) => Promise<{price?: unknown}>)(marketIndex);
-              if (oracleData?.price) {
-                markPrice = parseFloat(oracleData.price.toString()) / Math.pow(10, PRICE_PRECISION);
-              }
-            }
-            
-            // Calculate entry price from quoteEntryAmount
-            if (position.quoteEntryAmount) {
-              const quoteEntryAmount = position.quoteEntryAmount as ExtendedBN;
+          })
+          .map(async (position) => {
+            try {
+              const marketIndex = position.marketIndex as number;
               
-              if (quoteEntryAmount && baseAssetAmountBN && !isZeroBN(baseAssetAmountBN)) {
-                const quoteEntryFloat = parseFloat(quoteEntryAmount.toString());
-                const baseAssetAmountFloat = parseFloat(baseAssetAmountBN.toString());
-                
-                entryPrice = Math.abs(quoteEntryFloat / baseAssetAmountFloat);
-                entryPrice = entryPrice * (Math.pow(10, baseDecimals) / Math.pow(10, quoteDecimals));
-              }
-            }
-            
-            // If entry price couldn't be calculated, try SDK method
-            if (entryPrice === 0 && typeof subaccountAny.getPerpEntryPrice === 'function') {
+              // Get market info
+              const marketInfo = MARKET_MAPPING[marketIndex] || 
+                { name: `PERP-${marketIndex}`, baseDecimals: 8, quoteDecimals: 6 };
+              
+              // Determine direction
+              let direction: PositionDirection = 'Long';
+              const baseAssetAmount = position.baseAssetAmount;
+              
               try {
-                const sdkEntryPrice = await (subaccountAny.getPerpEntryPrice as (marketIndex: number) => Promise<unknown>)(marketIndex);
-                if (sdkEntryPrice) {
-                  entryPrice = parseFloat(sdkEntryPrice.toString());
-                }
-              } catch (_priceError) {
-                // Continue with zero entry price
+                direction = isBNGreaterThanZero(baseAssetAmount) ? 'Long' : 'Short';
+              } catch {
+                // Fallback to string method
+                const baseAssetAmountStr = baseAssetAmount?.toString() || '0';
+                direction = baseAssetAmountStr.startsWith('-') ? 'Short' : 'Long';
               }
-            }
-            
-            // Calculate PnL
-            let unrealizedPnl = 0;
-            let pnlPercent = 0;
-            
-            if (markPrice > 0 && entryPrice > 0 && baseAssetAmount > 0) {
-                        if (direction === PositionDirection.LONG) {
-                          unrealizedPnl = baseAssetAmount * (markPrice - entryPrice);
-                pnlPercent = ((markPrice / entryPrice) - 1) * 100;
-                        } else {
-                          unrealizedPnl = baseAssetAmount * (entryPrice - markPrice);
+              
+              // Calculate base amount with proper decimals
+              const baseDecimals = marketInfo.baseDecimals;
+              const quoteDecimals = marketInfo.quoteDecimals;
+              
+              const baseAssetAmountStr = baseAssetAmount?.toString() || '0';
+              const baseAssetAmountAbs = Math.abs(
+                parseFloat(baseAssetAmountStr) / Math.pow(10, baseDecimals)
+              );
+              
+              // Get mark price (oracle price)
+              let markPrice = 0;
+              let entryPrice = 0;
+              
+              // Try available methods to get oracle price
+              if (typeof typedClient.getOraclePrice === 'function') {
+                const oraclePrice = await typedClient.getOraclePrice(marketIndex);
+                if (oraclePrice) {
+                  markPrice = parseFloat(oraclePrice.toString()) / Math.pow(10, PRICE_PRECISION);
+                }
+              }
+              else if (typeof typedClient.getOraclePriceForMarket === 'function') {
+                const oraclePrice = await typedClient.getOraclePriceForMarket(marketIndex, true);
+                if (oraclePrice) {
+                  markPrice = parseFloat(oraclePrice.toString()) / Math.pow(10, PRICE_PRECISION);
+                }
+              }
+              else if (typeof typedClient.getOracleDataForPerpMarket === 'function') {
+                const oracleData = await typedClient.getOracleDataForPerpMarket(marketIndex);
+                if (oracleData?.price) {
+                  markPrice = parseFloat(oracleData.price.toString()) / Math.pow(10, PRICE_PRECISION);
+                }
+              }
+              
+              // Calculate entry price from quoteEntryAmount
+              if (position.quoteEntryAmount) {
+                const quoteEntryAmount = position.quoteEntryAmount;
+                
+                if (quoteEntryAmount && baseAssetAmount && !isZeroBN(baseAssetAmount)) {
+                  const quoteEntryFloat = parseFloat(quoteEntryAmount.toString());
+                  const baseAssetAmountFloat = parseFloat(baseAssetAmount.toString());
+                  
+                  entryPrice = Math.abs(quoteEntryFloat / baseAssetAmountFloat);
+                  entryPrice = entryPrice * (Math.pow(10, baseDecimals) / Math.pow(10, quoteDecimals));
+                }
+              }
+              
+              // If entry price couldn't be calculated, try SDK method
+              if (entryPrice === 0 && typeof typedUser.getPerpEntryPrice === 'function') {
+                try {
+                  const sdkEntryPrice = await typedUser.getPerpEntryPrice(marketIndex);
+                  if (sdkEntryPrice) {
+                    entryPrice = parseFloat(sdkEntryPrice.toString());
+                  }
+                } catch (err) {
+                  console.log('Could not get entry price from SDK:', err);
+                }
+              }
+              
+              // Calculate PnL
+              let unrealizedPnl = 0;
+              let pnlPercent = 0;
+              
+              if (markPrice > 0 && entryPrice > 0 && baseAssetAmountAbs > 0) {
+                if (direction === 'Long') {
+                  unrealizedPnl = baseAssetAmountAbs * (markPrice - entryPrice);
+                            pnlPercent = ((markPrice / entryPrice) - 1) * 100;
+                          } else {
+                  unrealizedPnl = baseAssetAmountAbs * (entryPrice - markPrice);
                             pnlPercent = ((entryPrice / markPrice) - 1) * 100;
                           }
                         }
                   
                   // Calculate notional value
-                  const notional = baseAssetAmount * markPrice;
+              const notional = baseAssetAmountAbs * markPrice;
                   
-            // Return formatted position data
+              // Return formatted position data
                   return {
-              market: marketInfo.name,
-                    direction: direction === PositionDirection.LONG ? 'Long' : 'Short',
-                    size: baseAssetAmount.toFixed(4),
+                market: marketInfo.name,
+                direction: direction,
+                size: baseAssetAmountAbs.toFixed(4),
                     notional: `$${notional.toFixed(2)}`,
                     entryPrice: `$${entryPrice.toFixed(2)}`,
                     markPrice: `$${markPrice.toFixed(2)}`,
                     pnl: `${unrealizedPnl >= 0 ? '+' : ''}$${unrealizedPnl.toFixed(2)}`,
                     pnlPercent: `${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%`,
+                marketIndex: marketIndex,
+                markPriceValue: markPrice,
                   };
-          } catch (error) {
-            console.error('Error processing position:', error);
+            } catch (error) {
+              console.error('Error processing position:', error);
                   return null;
                 }
               })
@@ -282,15 +345,35 @@ const PerpPositionTab = () => {
           setPositions(formattedPositions.filter(Boolean) as PositionData[]);
       
     } catch (error) {
-      console.error('Error loading positions:', error);
-          setError('Could not load positions. The Drift client may not be fully subscribed.');
+      console.error('Error fetching positions:', error);
+      setError('Failed to fetch positions. Please try again.');
         } finally {
           setLoading(false);
         }
       };
 
+  // Subscribe to position updates
       useEffect(() => {
-        refreshPositions();
+    // No need for subscription variable as we aren't using it
+    
+    const subscribeToPositions = async () => {
+      try {
+        if (selectedSubaccount && driftClient) {
+          await refreshPositions();
+        }
+      } catch (error) {
+        console.error('Error subscribing to position updates:', error);
+      }
+    };
+    
+    if (selectedSubaccount && driftClient) {
+      subscribeToPositions();
+    }
+    
+    // Clean up function can be empty since we're not using a subscription
+    return () => {
+      // No subscription to unsubscribe from
+    };
       }, [selectedSubaccount, driftClient]);
     
       if (!selectedSubaccount) {
@@ -300,6 +383,24 @@ const PerpPositionTab = () => {
           </div>
         );
       }
+
+      // Handle opening the TP/SL form
+      const handleOpenTpSlForm = (position: PositionData) => {
+        // Find the market index from the market name
+        const marketEntry = Object.entries(MARKET_MAPPING).find(
+          ([, val]) => val.name === position.market
+        );
+        
+        const marketIndex = marketEntry ? parseInt(marketEntry[0], 10) : 0;
+        const markPriceValue = parseFloat(position.markPrice.replace('$', ''));
+        
+        setSelectedPosition({
+          ...position,
+          marketIndex,
+          markPriceValue
+        });
+        setIsTpSlModalOpen(true);
+      };
     
     return ( 
         <div className="p-4">
@@ -367,6 +468,9 @@ const PerpPositionTab = () => {
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                   PnL %
                 </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
@@ -408,6 +512,14 @@ const PerpPositionTab = () => {
                       {position.pnlPercent}
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <button
+                      onClick={() => handleOpenTpSlForm(position)}
+                      className="text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded transition-colors"
+                    >
+                      TP/SL
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -421,6 +533,18 @@ const PerpPositionTab = () => {
               ? 'Unable to load positions due to connection issues.' 
               : 'No positions found.'}
         </div>
+      )}
+      
+      {/* Take Profit / Stop Loss Form Modal */}
+      {selectedPosition && (
+        <TakeProfitStopLossForm
+          position={selectedPosition as Position}
+          isOpen={isTpSlModalOpen}
+          onClose={() => {
+            setIsTpSlModalOpen(false);
+            setSelectedPosition(null);
+          }}
+        />
       )}
     </div>
      );

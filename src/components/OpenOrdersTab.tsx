@@ -48,7 +48,7 @@ interface OrderData {
 }
 
 const OpenOrdersTab = () => {
-  const { selectedSubaccount, driftClient } = useAppStore();
+  const { selectedSubaccount } = useAppStore();
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

@@ -105,7 +105,7 @@ export default function WelcomeViewer() {
       <button
         onClick={handleViewWalletData}
         disabled={!walletAddress || fetchingCustomWallet}
-        className="w-full py-3 px-6 bg-[#3053AB] hover:bg-blue-700 disabled:bg-blue-800
+        className="w-full py-3 px-6 bg-[#3053AB] hover:bg-blue-700 disabled:bg-[#3053AB]
         disabled:opacity-50 rounded-lg transition-colors text-white font-medium"
       >
         {fetchingCustomWallet ? 'Loading...' : 'View Wallet Data'}

@@ -44,7 +44,7 @@ export default function ConnectButton({ className }: ConnectButtonProps) {
   if (!authority) {
     return (
       <button
-        className={`flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors ${className}`}
+        className={`flex items-center gap-2 px-4 py-2 text-white bg-[#3053AB] rounded-lg hover:bg-blue-700 transition-colors ${className}`}
         onClick={openConnectWalletModal}
       >
         <span>Connect Wallet</span>
@@ -55,7 +55,7 @@ export default function ConnectButton({ className }: ConnectButtonProps) {
   return (
     <div className="relative" ref={menuRef}>
       <button
-        className={`flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors ${className}`}
+        className={`flex items-center gap-2 px-4 py-2 text-white bg-[#288D41] rounded-lg hover:bg-[#288D41] transition-colors ${className}`}
         onClick={() => setIsMenuOpen(!isMenuOpen)}
       >
         <span>{abbreviateAddress(authority.toString())}</span>
@@ -66,7 +66,7 @@ export default function ConnectButton({ className }: ConnectButtonProps) {
           <div className="py-2">
             <button
               onClick={handleDisconnect}
-              className="w-full px-4 py-2 text-left text-white hover:bg-slate-700 transition-colors"
+              className="w-full px-4 py-2 text-left text-white hover:bg-[#8D282B] transition-colors"
             >
               Disconnect
             </button>

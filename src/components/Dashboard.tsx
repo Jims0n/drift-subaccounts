@@ -30,7 +30,7 @@ export default function Dashboard() {
   }
 
   const getSubaccountName = (index: number) => {
-    return `SubAccount ${index + 1}`;
+    return `SubAccount ${index }`;
   };
 
   return (
@@ -47,7 +47,7 @@ export default function Dashboard() {
                 onClick={() => setSelectedSubaccount(subaccount)}
                 className={`px-4 py-2 rounded-md transition-colors ${
                   selectedSubaccount === subaccount
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-[#3053AB] text-white'
                     : 'bg-[#1E2131] text-gray-300 hover:bg-[#2A2E45]'
                 }`}
               >
@@ -56,7 +56,7 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-        <button className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
+        <button className="flex items-center bg-[#3053AB] hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
           <span className="mr-1">+</span> Create
         </button>
       </div>
@@ -66,7 +66,7 @@ export default function Dashboard() {
         {/* Balances Section */}
         <div className="flex-1 bg-[#0F1120] rounded-lg overflow-hidden shadow-lg">
           <div className="p-4 border-b border-gray-800">
-            <h2 className="text-lg font-medium">Balances {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+            <h2 className="text-lg font-medium">Balances {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount)})`}</h2>
           </div>
           <div className="p-4">
             <BalancesTab />
@@ -75,7 +75,7 @@ export default function Dashboard() {
           {/* Actions */}
           <div className="p-4 flex gap-2">
             <button 
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+              className="bg-[#3053AB] hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
               onClick={() => setShowDepositForm(true)}
             >
               Deposit
@@ -90,7 +90,7 @@ export default function Dashboard() {
           
           {/* Open Orders */}
           <div className="p-4 border-t border-gray-800">
-            <h2 className="text-lg font-medium mb-4">Open Orders {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+            <h2 className="text-lg font-medium mb-4">Open Orders {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount)})`}</h2>
             <OpenOrdersTab />
           </div>
         </div>
@@ -98,7 +98,7 @@ export default function Dashboard() {
         {/* Perpetual Positions Section */}
         <div className="flex-1 bg-[#0F1120] rounded-lg overflow-hidden shadow-lg">
           <div className="p-4 border-b border-gray-800">
-            <h2 className="text-lg font-medium">Perpetual Positions {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+            <h2 className="text-lg font-medium">Perpetual Positions {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount)})`}</h2>
           </div>
           <div className="p-4">
             <PerpPostionTab />
@@ -108,7 +108,7 @@ export default function Dashboard() {
         {/* Place Order Section */}
         <div className="flex-1 bg-[#0F1120] rounded-lg overflow-hidden shadow-lg">
           <div className="p-4 border-b border-gray-800">
-            <h2 className="text-lg font-medium">Place Order {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount) + 1})`}</h2>
+            <h2 className="text-lg font-medium">Place Order {selectedSubaccount && `(Sub ${subaccounts.indexOf(selectedSubaccount)})`}</h2>
           </div>
           <div className="p-6">
             <PerpOrderForm />
