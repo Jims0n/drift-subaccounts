@@ -44,10 +44,14 @@ base_directory=$(pwd)
 
 # Build SDK first
 print "Building SDK"
-build_package "./drift-protocol-v2/sdk" "build:browser" "npm install @project-serum/borsh @solana/spl-token"
+build_package "./drift-protocol-v2/sdk" "build:browser" "npm install @project-serum/borsh @solana/spl-token --legacy-peer-deps"
 
 # Return to base directory
 cd "${base_directory}"
+
+# Install rpc-websockets fix for module resolution
+print "Installing rpc-websockets fix"
+print_exec_command "${SCRIPT_NAME}" "npm install rpc-websockets@7.5.1 --legacy-peer-deps"
 
 # Build main application
 print "Building main application"

@@ -1,4 +1,8 @@
 /** @type {import('next').NextConfig} */
+// Using require for Node.js modules that run during build
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const path = require('path');
+
 const nextConfig = {
   webpack: (config) => {
     // Add fallbacks for Node.js modules
@@ -18,6 +22,18 @@ const nextConfig = {
       process: require.resolve('process/browser'),
     };
 
+    // Add resolvers for specific problematic modules
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      // Handle rpc-websockets resolution issue
+      'rpc-websockets/dist/lib/client': path.resolve(__dirname, 'rpc-websockets-resolve.js'),
+      'rpc-websockets/dist/lib/client/websocket': path.resolve(__dirname, 'rpc-websockets-resolve.js'),
+      // Provide a shim for any Node.js specific modules
+      'fs': path.resolve(__dirname, 'node-browser-compatibility.js'),
+      'net': path.resolve(__dirname, 'node-browser-compatibility.js'),
+      'tls': path.resolve(__dirname, 'node-browser-compatibility.js'),
+    };
+
     return config;
   },
   // Use transpilePackages to transpile specific packages that use Node.js modules
@@ -26,7 +42,10 @@ const nextConfig = {
     '@coral-xyz/anchor',
     '@coral-xyz/anchor-30',
     '@project-serum/anchor',
-    '@solana/web3.js'
+    '@solana/web3.js',
+    'rpc-websockets',
+    '@pythnetwork/pyth-solana-receiver',
+    'jito-ts'
   ],
   // Exclude specific directories from TypeScript compilation
   typescript: {

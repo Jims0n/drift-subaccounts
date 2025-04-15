@@ -28,7 +28,7 @@ function install_and_link() {
   print "Installing dependencies for ${folder}"
   cd "${folder}"
   
-  print_exec_command "${SCRIPT_NAME}" "npm install"
+  print_exec_command "${SCRIPT_NAME}" "npm install --legacy-peer-deps"
   
   # Link the package if requested
   if [ "${should_link}" = "true" ]; then
